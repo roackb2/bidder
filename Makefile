@@ -22,3 +22,5 @@ run-server:
 	--name $(project_name) \
 	-p 80:$(container_port) \
 	$(project_name):latest
+
+build-and-run-server: build-server run-server

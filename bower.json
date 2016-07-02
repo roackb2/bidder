@@ -1,0 +1,21 @@
+{
+  "name": "bidder",
+  "version": "0.0.0",
+  "homepage": "https://github.com/roackb2/bidder",
+  "authors": [
+    "Jay Liang <roackb2@gmail.com>"
+  ],
+  "description": "A bidder system",
+  "main": "app.js",
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests",
+    "setup-env.sh"
+  ],
+  "dependencies": {
+  }
+}
