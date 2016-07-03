@@ -4,14 +4,24 @@ var favicon = require('serve-favicon');
 var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
-
 var routes = require('./routes/index');
 var users = require('./routes/users');
-var bluebird = require('bluebird')
+
+var stringify = require('stringify')
+var uuid = require('node-uuid');
+var Promise = require('bluebird')
 var redis = require('redis');
 
-// setup express
+var items = require('./lib/items')
+
 var app = express();
+var server = app.listen(80);
+var io = require('socket.io').listen(server);
+
+Promise.promisifyAll(redis.RedisClient.prototype);
+Promise.promisifyAll(redis.Multi.prototype);
+var redisClient = redis.createClient('6379', process.env.REDIS_CLUSTER);
+
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
@@ -63,11 +73,45 @@ app.use(function(err, req, res, next) {
 // module.exports = app;
 
 // setup socket.io
-var http = require('http').Server(app);
-var io = require('socket.io')(http);
-
 io.on('connection', function(socket) {
-    console.log('a user connected');
+    username = uuid.v1();
+    userID = undefined
+    console.log('a user connected with username: ' + username);
+    // generate unique (incremental) userID
+    redisClient.incrAsync("next_user_id").then(function(res) {
+        userID = res
+            // store user data using hash
+        return redisClient.hmsetAsync("user:" + userID, ["username", username, "balance", 100])
+    }).then(function(res) {
+        // index userID with username
+        return redisClient.hsetAsync("users", [username, userID])
+    }).then(function(res) {
+        promises = []
+        for (var i = 0; i < 10; i++) {
+            index = Math.floor(Math.random() * 100) % items.length
+            item = items[index]
+            item.user = userID
+                // generate unique (incremental) item id
+            promises.push(Promise.join(redisClient.incrAsync("next_item_id"), item).spread(function(id, item) {
+                item.id = id
+                return Promise.all([
+                    // store new item with hash
+                    redisClient.hmsetAsync("items:" + item.id, ["name", item.name, "price", item.price]),
+                    // mark ownership of an item of a user with sorted set
+                    redisClient.zaddAsync("assets:" + item.user, [item.price, item.id])
+                ])
+            }))
+        }
+        return Promise.map(promises, function(item) {
+
+        })
+    }).then(function() {
+        socket.emit("username", username)
+        console.log("done setting up user data")
+    }).catch(function(err) {
+        console.log(err)
+    })
+
     socket.on('start message', function(msg) {
         console.log('user send start message: ' + msg)
     })
@@ -83,10 +127,6 @@ io.on('connection', function(socket) {
 });
 
 // setup redis
-bluebird.promisifyAll(redis.RedisClient.prototype);
-bluebird.promisifyAll(redis.Multi.prototype);
-var redisClient = redis.createClient('6379', process.env.REDIS_CLUSTER);
-
 redisClient.on("ready", function() {
     console.log("redis ready")
 })
@@ -111,23 +151,23 @@ var amqpUrl = genAmqpUrl({
 console.log("connecting to RabbitMQ: " + amqpUrl)
 
 amqp.connect(amqpUrl).then(function(conn) {
-      conn.on("error", function(err) {
+    conn.on("error", function(err) {
         if (err.message !== "Connection closing") {
-          console.error("[AMQP] conn error", err.message);
+            console.error("[AMQP] conn error", err.message);
         }
-      });
-      conn.on("close", function() {
+    });
+    conn.on("close", function() {
         console.error("[AMQP] reconnecting");
-      });
-      console.log("[AMQP] connected");
-      amqpConn = conn;
+    });
+    console.log("[AMQP] connected");
+    amqpConn = conn;
 }).catch(function(err) {
     console.log("amqp error: " + err)
 });
 
-http.listen(80, function() {
-    console.log('server listening on *:80');
-});
+// http.listen(80, function() {
+//     console.log('server listening on *:80');
+// });
 
 
 // handling signals if process is PID1 in containers
