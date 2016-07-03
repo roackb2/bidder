@@ -10,75 +10,7 @@ var users = require('./routes/users');
 var bluebird = require('bluebird')
 var redis = require('redis');
 
-// setup socket.io
-var http = require('http').Server(app);
-var io = require('socket.io')(http);
-
-io.on('connection', function(socket) {
-    console.log('a user connected');
-    socket.on('start message', function(msg) {
-        console.log('user send start message: ' + msg)
-    })
-
-    socket.on('disconnect', function() {
-        console.log('user disconnected');
-    });
-
-    socket.on('close', function() {
-        console.log('socket closed');
-    });
-
-});
-
-// setup redis
-bluebird.promisifyAll(redis.RedisClient.prototype);
-bluebird.promisifyAll(redis.Multi.prototype);
-var redisClient = redis.createClient('6379', process.env.REDIS_CLUSTER);
-
-redisClient.on("ready", function() {
-    console.log("redis ready")
-})
-
-redisClient.on("error", function(error) {
-    console.log(error);
-});
-
-// setup RabbitMQ
-var amqp = require('amqp');
-var rabbitConn = amqp.createConnection({
-    host: process.env.RABBIT_HOST,
-    port: 5672,
-    login: process.env.RABBIT_USER,
-    password: process.env.RABBIT_PASSWORD,
-    connectionTimeout: 10000,
-    authMechanism: 'AMQPLAIN',
-    vhost: process.env.RABBIT_VHOST,
-    noDelay: true,
-    ssl: {
-        enabled: false
-    }
-});
-
-rabbitConn.on('error', function(e) {
-    console.log("Error from amqp: ", e);
-});
-
-// Wait for connection to become established.
-rabbitConn.on('ready', function() {
-    console.log("rabbit ready")
-        // // Use the default 'amq.topic' exchange
-        // rabbitConn.queue('my-queue', function (q) {
-        //     // Catch all messages
-        //     q.bind('#');
-        //
-        //     // Receive messages
-        //     q.subscribe(function (message) {
-        //       // Print messages to stdout
-        //       console.log(message);
-        //     });
-        // });
-});
-
+// setup express
 var app = express();
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
@@ -128,8 +60,70 @@ app.use(function(err, req, res, next) {
     });
 });
 
-
 // module.exports = app;
+
+// setup socket.io
+var http = require('http').Server(app);
+var io = require('socket.io')(http);
+
+io.on('connection', function(socket) {
+    console.log('a user connected');
+    socket.on('start message', function(msg) {
+        console.log('user send start message: ' + msg)
+    })
+
+    socket.on('disconnect', function() {
+        console.log('user disconnected');
+    });
+
+    socket.on('close', function() {
+        console.log('socket closed');
+    });
+
+});
+
+// setup redis
+bluebird.promisifyAll(redis.RedisClient.prototype);
+bluebird.promisifyAll(redis.Multi.prototype);
+var redisClient = redis.createClient('6379', process.env.REDIS_CLUSTER);
+
+redisClient.on("ready", function() {
+    console.log("redis ready")
+})
+
+redisClient.on("error", function(error) {
+    console.log("redis error: " + error);
+});
+
+// setup RabbitMQ
+function genAmqpUrl(conf) {
+    return "amqp://" + conf.user + ":" + conf.password + "@" + conf.host + ":" + conf.port + "/" + conf.vhost
+}
+var amqp = require('amqplib');
+var amqpConn = null;
+var amqpUrl = genAmqpUrl({
+    host: process.env.RABBIT_HOST,
+    port: 5672,
+    user: process.env.RABBIT_USER,
+    password: process.env.RABBIT_PASSWORD,
+    vhost: process.env.RABBIT_VHOST
+})
+console.log("connecting to RabbitMQ: " + amqpUrl)
+
+amqp.connect(amqpUrl).then(function(conn) {
+      conn.on("error", function(err) {
+        if (err.message !== "Connection closing") {
+          console.error("[AMQP] conn error", err.message);
+        }
+      });
+      conn.on("close", function() {
+        console.error("[AMQP] reconnecting");
+      });
+      console.log("[AMQP] connected");
+      amqpConn = conn;
+}).catch(function(err) {
+    console.log("amqp error: " + err)
+});
 
 http.listen(80, function() {
     console.log('server listening on *:80');
@@ -144,7 +138,6 @@ var signals = {
 
 function shutdown(signal, value) {
     redisClient.quit()
-    rabbitConn.close()
     io.close()
     console.log('server stopped by ' + signal);
     process.exit(128 + value);

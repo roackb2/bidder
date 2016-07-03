@@ -1,5 +1,8 @@
 FROM node:6.2.2
 
+RUN apt-get update
+RUN apt-get install -y net-tools net-tools wget
+
 RUN mkdir -p /usr/src/app
 WORKDIR /usr/src/app
 ADD package.json .
