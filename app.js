@@ -10,25 +10,6 @@ var users = require('./routes/users');
 var bluebird = require('bluebird')
 var redis = require('redis');
 
-// handling signals if process is PID1 in containers
-var signals = {
-    'SIGINT': 2,
-    'SIGTERM': 15
-};
-
-function shutdown(signal, value) {
-    io.close(function() {
-        console.log('server stopped by ' + signal);
-        process.exit(128 + value);
-    });
-}
-
-Object.keys(signals).forEach(function(signal) {
-    process.on(signal, function() {
-        shutdown(signal, signals[signal]);
-    });
-});
-
 // setup socket.io
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
@@ -42,6 +23,11 @@ io.on('connection', function(socket) {
     socket.on('disconnect', function() {
         console.log('user disconnected');
     });
+
+    socket.on('close', function() {
+        console.log('socket closed');
+    });
+
 });
 
 // setup redis
@@ -50,7 +36,7 @@ bluebird.promisifyAll(redis.Multi.prototype);
 var redisClient = redis.createClient('6379', process.env.REDIS_CLUSTER);
 
 redisClient.on("ready", function() {
-    console.log("redies ready")
+    console.log("redis ready")
 })
 
 redisClient.on("error", function(error) {
@@ -145,6 +131,27 @@ app.use(function(err, req, res, next) {
 
 // module.exports = app;
 
-http.listen(3000, function() {
-    console.log('server listening on *:3000');
+http.listen(80, function() {
+    console.log('server listening on *:80');
+});
+
+
+// handling signals if process is PID1 in containers
+var signals = {
+    'SIGINT': 2,
+    'SIGTERM': 15
+};
+
+function shutdown(signal, value) {
+    redisClient.quit()
+    rabbitConn.close()
+    io.close()
+    console.log('server stopped by ' + signal);
+    process.exit(128 + value);
+}
+
+Object.keys(signals).forEach(function(signal) {
+    process.on(signal, function() {
+        shutdown(signal, signals[signal]);
+    });
 });

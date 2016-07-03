@@ -3,7 +3,7 @@ base_dockerfile = build/base.Dockerfile
 server_dockerfile = build/prod.Dockerfile
 simple_base_image_tag = node-base
 base_image_tag = $(registry):$(simple_base_image_tag)
-container_port = 3000
+container_port = 80
 start_cmd = node app.js
 
 aws_access_key_id = $(shell echo $$AWS_ACCESS_KEY_ID)
@@ -28,6 +28,7 @@ build-server: $(server_dockerfile)
 run-server:
 	docker run -it --rm \
 	--name $(project_name) \
+	--net=host \
 	-p 80:$(container_port) \
 	-e "AWS_ACCESS_KEY_ID=$(aws_access_key_id)" \
 	-e "AWS_SECRET_ACCESS_KEY=$(aws_secret_access_key)" \
