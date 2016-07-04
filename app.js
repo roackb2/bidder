@@ -87,11 +87,13 @@ io.on('connection', function(socket) {
         return redisClient.hsetAsync("users", [username, userID])
     }).then(function(res) {
         promises = []
+        userItems = []
         for (var i = 0; i < 10; i++) {
             index = Math.floor(Math.random() * 100) % items.length
             item = items[index]
             item.user = userID
-                // generate unique (incremental) item id
+            userItems.push(item)
+            // generate unique (incremental) item id
             promises.push(Promise.join(redisClient.incrAsync("next_item_id"), item).spread(function(id, item) {
                 item.id = id
                 return Promise.all([
@@ -102,9 +104,8 @@ io.on('connection', function(socket) {
                 ])
             }))
         }
-        return Promise.map(promises, function(item) {
-
-        })
+        socket.emit('user-items', userItems)
+        return Promise.all(promises)
     }).then(function() {
         socket.emit("username", username)
         console.log("done setting up user data")

@@ -1,6 +1,8 @@
-var socket = io();
-socket.emit('start message', 'hi');
+var app = angular.module('biddingApp', []);
 
-socket.on("username", function(username) {
-    $("#username").text("your user name is " + username)
-})
+app.controller('MainController', ['$scope', 'socket', function($scope, socket) {
+    ctrl = this
+    socket.on('username', function(username) {
+        ctrl.username = username
+    })
+}])
