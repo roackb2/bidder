@@ -12,10 +12,10 @@ var uuid = require('node-uuid');
 var Promise = require('bluebird')
 var redis = require('redis');
 
-var items = require('./lib/items')
+var Product = require('./lib/product')
 
 var app = express();
-var server = app.listen(80);
+var server = app.listen(3000);
 var io = require('socket.io').listen(server);
 
 Promise.promisifyAll(redis.RedisClient.prototype);
@@ -89,18 +89,16 @@ io.on('connection', function(socket) {
         promises = []
         userItems = []
         for (var i = 0; i < 10; i++) {
-            index = Math.floor(Math.random() * 100) % items.length
-            item = items[index]
-            item.user = userID
+            item = Product.GetRandomItem()
             userItems.push(item)
             // generate unique (incremental) item id
             promises.push(Promise.join(redisClient.incrAsync("next_item_id"), item).spread(function(id, item) {
                 item.id = id
                 return Promise.all([
                     // store new item with hash
-                    redisClient.hmsetAsync("items:" + item.id, ["name", item.name, "price", item.price]),
+                    redisClient.hmsetAsync("items:" + item.id, ["name", item.name, "owner", item.owner]),
                     // mark ownership of an item of a user with sorted set
-                    redisClient.zaddAsync("assets:" + item.user, [item.price, item.id])
+                    redisClient.zaddAsync("assets:" + item.owner, [item.createdAt, item.id])
                 ])
             }))
         }
@@ -111,6 +109,10 @@ io.on('connection', function(socket) {
         console.log("done setting up user data")
     }).catch(function(err) {
         console.log(err)
+    })
+
+    socket.on("sell", function(item) {
+        console.log("user selling item " + stringify(item))
     })
 
     socket.on('start message', function(msg) {

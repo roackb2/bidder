@@ -1,9 +1,9 @@
 project_name = bidder
 base_dockerfile = build/base.Dockerfile
 server_dockerfile = build/prod.Dockerfile
-simple_base_image_tag = node-base
+simple_base_image_tag = bidder-base
 base_image_tag = $(registry):$(simple_base_image_tag)
-container_port = 80
+container_port = 3000
 start_cmd = node app.js
 
 aws_access_key_id = $(shell echo $$AWS_ACCESS_KEY_ID)

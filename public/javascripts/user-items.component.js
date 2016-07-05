@@ -3,8 +3,17 @@ app.component('userItems', {
     controller: function UserItemsController($scope, socket) {
         var ctrl = this
         socket.on('user-items', function(items) {
-            console.log(items)
             ctrl.items = items
         })
+
+        ctrl.sell = function(item) {
+            if(!item.price || item.price < 0) {
+                alert("item price must be greater than zero")
+                return
+            }
+            delete item.$$hashKey
+            item.published = true
+            socket.emit("sell", item)
+        }
     }
 });
