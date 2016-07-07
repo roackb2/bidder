@@ -23,6 +23,22 @@ Promise.promisifyAll(redis.RedisClient.prototype);
 Promise.promisifyAll(redis.Multi.prototype);
 var redisClient = redis.createClient('6379', process.env.REDIS_CLUSTER);
 
+function genAmqpUrl(conf) {
+    return "amqp://" + conf.user + ":" + conf.password + "@" + conf.host + ":" + conf.port + "/" + conf.vhost
+}
+var ORDER_QUEUE = "orders"
+var PUBLISH_QUEUE = "publishments"
+var amqp = require('amqplib');
+var amqpConn = null;
+var amqpChan = null;
+var amqpUrl = genAmqpUrl({
+    host: process.env.RABBIT_HOST,
+    port: 5672,
+    user: process.env.RABBIT_USER,
+    password: process.env.RABBIT_PASSWORD,
+    vhost: process.env.RABBIT_VHOST
+})
+
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
@@ -97,7 +113,7 @@ io.on('connection', function(socket) {
         promises = []
         for (var i = 0; i < 10; i++) {
             item = Product.GetRandomItem(userID, username)
-            // generate unique (incremental) item id
+                // generate unique (incremental) item id
             promises.push(Promise.join(redisClient.incrAsync("next_item_id"), item).spread(function(id, item) {
                 item.id = id
                 return Promise.all([
@@ -139,6 +155,7 @@ io.on('connection', function(socket) {
     socket.on("sell", function(item) {
         item.publishedAt = new Date().getTime()
         socket.broadcast.emit("published", item)
+        amqpChan.publish("", PUBLISH_QUEUE, new Buffer(JSON.stringify(item)))
         Promise.all([
             redisClient.hsetAsync("items:" + item.id, "price", item.price),
             redisClient.zaddAsync("published:" + item.ownerID, [item.publishedAt, item.id])
@@ -150,8 +167,10 @@ io.on('connection', function(socket) {
     })
 
     socket.on("order", function(order) {
+        amqpChan.publish("", ORDER_QUEUE, new Buffer(JSON.stringify(order)))
         redisClient.hmsetAsync("ordered:" + order.user, [
             "item", order.item.id,
+            "time", new Date().getTime(),
             "price", order.item.biddingPrice
         ]).then(function() {
             console.log("done updating a new order")
@@ -180,20 +199,7 @@ redisClient.on("error", function(error) {
 });
 
 // setup RabbitMQ
-function genAmqpUrl(conf) {
-    return "amqp://" + conf.user + ":" + conf.password + "@" + conf.host + ":" + conf.port + "/" + conf.vhost
-}
-var amqp = require('amqplib');
-var amqpConn = null;
-var amqpUrl = genAmqpUrl({
-    host: process.env.RABBIT_HOST,
-    port: 5672,
-    user: process.env.RABBIT_USER,
-    password: process.env.RABBIT_PASSWORD,
-    vhost: process.env.RABBIT_VHOST
-})
 console.log("connecting to RabbitMQ: " + amqpUrl)
-
 amqp.connect(amqpUrl).then(function(conn) {
     conn.on("error", function(err) {
         if (err.message !== "Connection closing") {
@@ -205,9 +211,57 @@ amqp.connect(amqpUrl).then(function(conn) {
     });
     console.log("[AMQP] connected");
     amqpConn = conn;
+    return conn.createChannel()
+}).then(function(ch) {
+    ch.on("error", function(err) {
+        console.error("[AMQP] channel error", err.message);
+    });
+    ch.on("close", function() {
+        console.log("[AMQP] channel closed");
+    });
+    amqpChan = ch
+
+    amqpChan.prefetch(10);
+    return amqpChan.assertQueue(PUBLISH_QUEUE, {
+        durable: true
+    })
+}).then(function() {
+    return amqpChan.assertQueue(ORDER_QUEUE, {
+        durable: true
+    })
+}).then(function(){
+    console.log("done setting up RabbitMQ")
 }).catch(function(err) {
     console.log("amqp error: " + err)
 });
+
+function processPublishments(msg) {
+    item = JSON.parse(msg.content)
+    console.log("comsuming publishment: " + stringify(item))
+}
+
+function processOrders(msg) {
+    order = JSON.parse(msg.content)
+    console.log("consuming order: " + stringify(order))
+}
+
+setInterval(function() {
+    publishments = []
+    amqpChan.get(PUBLISH_QUEUE).then(function(msg) {
+        processPublishments(msg)
+    }, function(err) {
+        console.log("error on processing publishments: " + err)
+    });
+}, 3000)
+
+setInterval(function() {
+    amqpChan.get(ORDER_QUEUE).then(function(msg) {
+        processOrders(msg)
+    }, function(err) {
+        console.log("error on processing orders: " + err)
+    });
+}, 3000)
+
 
 // http.listen(80, function() {
 //     console.log('server listening on *:80');

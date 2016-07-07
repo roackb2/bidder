@@ -1,5 +1,3 @@
-module.exports = stringify;
-
 function stringify(obj, ignoreFunc, printFuncContent, former, depth, path) {
     var indent = "    ";
     if (ignoreFunc == undefined) {
