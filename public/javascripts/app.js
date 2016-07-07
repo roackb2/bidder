@@ -1,8 +1,10 @@
 var app = angular.module('biddingApp', []);
 
-app.controller('MainController', ['$scope', 'socket', function($scope, socket) {
+app.controller('MainController', ['$scope', '$rootScope', 'socket', function($scope, $rootScope, socket) {
     ctrl = this
-    socket.on('username', function(username) {
-        ctrl.username = username
+    socket.on('user-info', function(info) {
+        console.log(info)
+        $rootScope.userInfo = info
+        $scope.username = info.name
     })
 }])

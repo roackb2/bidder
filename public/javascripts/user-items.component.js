@@ -13,6 +13,7 @@ app.component('userItems', {
             }
             delete item.$$hashKey
             item.published = true
+            console.log(item)
             socket.emit("sell", item)
         }
     }

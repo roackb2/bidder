@@ -1,13 +1,23 @@
 app.component('otherItems', {
     templateUrl: 'html/other-items.html',
-    controller: function OtherItemController($scope, socket) {
+    controller: function OtherItemController($scope, $rootScope, socket) {
         var ctrl = this
+
         socket.on('other-items', function(items) {
+            console.log(items)
             ctrl.items = items
         })
 
-        ctrl.buy = function(item) {
-            socket.emit("buy", item)
+        socket.on('published', function(item) {
+            ctrl.items.push(item)
+        })
+
+        ctrl.order = function(item) {
+            item.ordered = true
+            socket.emit("order", {
+                user: $rootScope.userInfo.id,
+                item: item
+            })
         }
     }
 });

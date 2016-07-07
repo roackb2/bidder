@@ -15,19 +15,19 @@
     <script type='text/javascript' src='/javascripts/app.js'></script>
     <script type='text/javascript' src='/javascripts/services.js'></script>
     <script type='text/javascript' src='/javascripts/user-items.component.js'></script>
+    <script type='text/javascript' src='/javascripts/other-items.component.js'></script>
     <link rel='stylesheet' href='/stylesheets/style.css' />
 </head>
 
 <body ng-app="biddingApp" ng-controller="MainController as main" class="container-fluid">
     <div class="row">
         <div class="col-md-12">
-            Hello!~, your ID is {{ main.username }}
+            Hello!~, your ID is {{ username }}
         </div>
     </div>
     </br>
-    <div class="row">
-        <user-items></user-items>
-    </div>
+    <user-items></user-items>
+    <other-items></other-items>
 </body>
 
 </html>

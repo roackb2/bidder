@@ -90,64 +90,67 @@ io.on('connection', function(socket) {
         // index userID with username
         return redisClient.hsetAsync("users", [username, userID])
     }).then(function(res) {
-        socket.emit("username", username)
+        socket.emit("user-info", {
+            id: userID,
+            name: username
+        })
         promises = []
-        userItems = []
         for (var i = 0; i < 10; i++) {
-            item = Product.GetRandomItem()
-            userItems.push(item)
+            item = Product.GetRandomItem(userID, username)
             // generate unique (incremental) item id
             promises.push(Promise.join(redisClient.incrAsync("next_item_id"), item).spread(function(id, item) {
                 item.id = id
                 return Promise.all([
+                    item,
                     // store new item with hash
                     redisClient.hmsetAsync("items:" + item.id, [
                         "name", item.name,
-                        "owner", item.owner,
+                        "ownerID", item.ownerID,
+                        "ownerName", item.ownerName,
                         "createdAt", item.createdAt,
                         "price", item.price,
                         "published", item.published,
                         "sold", item.sold
                     ]),
                     // mark ownership of an item of a user with sorted set
-                    redisClient.zaddAsync("assets:" + item.owner, [item.createdAt, item.id])
+                    redisClient.zaddAsync("assets:" + item.ownerID, [item.createdAt, item.id]),
                 ])
             }))
         }
-        socket.emit('user-items', userItems)
         return Promise.all(promises)
-    }).then(function() {
-        return redisClient.keysAsync("assets:*")
-    }).then(function(keys) {
-        return Promise.map(keys, function(key) {
-            userId = key.replace("assets:", "")
-            return Promise.join(redisClient.hgetallAsync("user:" + userId), redisClient.zrangeAsync("assets:" + userId, 0, -1)).spread(function(user, assets) {
-                console.log("user: " + stringify(user))
-                console.log("assets: " + stringify(assets))
-                return Promise.join(user, Promise.map(assets, function(itemID) {
-                    return redisClient.hgetallAsync("items:" + itemID)
-                })).spread(function(user, items) {
-                    return {
-                        user: user,
-                        items: items
-                    }
-                })
+    }).then(function(results) {
+        userItems = _.map(results, function(result) {
+            return result[0]
+        })
+        socket.emit('user-items', userItems)
+        return redisClient.keysAsync("published:*").map(function(key) {
+            return redisClient.zrangeAsync(key, 0, -1).map(function(itemID) {
+                return redisClient.hgetallAsync("items:" + itemID)
             })
         })
-    }).then(function(otherItems) {
-        socket.emit("other-items", otherItems)
+    }).then(function(res) {
+        socket.emit("other-items", _.flatten(res))
         console.log("done setting up user data")
     }).catch(function(err) {
         console.log(err)
     })
 
     socket.on("sell", function(item) {
-        // TODO: save published items in Redis
-        console.log("user selling item " + stringify(item))
+        console.log("user selling item: " + stringify(item))
+        item.publishedAt = new Date().getTime()
+        socket.broadcast.emit("published", item)
+        Promise.all([
+            redisClient.hsetAsync("items:" + item.id, "price", item.price),
+            redisClient.zaddAsync("published:" + item.ownerID, [item.publishedAt, item.id])
+        ]).then(function() {
+            console.log("done update records for published item")
+        }).catch(function(err) {
+            console.log("error on sell: " + err)
+        })
     })
 
-    socket.on('start message', function(msg) {
-        console.log('user send start message: ' + msg)
+    socket.on("order", function(order) {
+        console.log("here comes an order: " + stringify(order))
     })
 
     socket.on('disconnect', function() {

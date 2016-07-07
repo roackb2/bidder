@@ -1,20 +1,25 @@
-<ul>
-    And here are items you could buy
-    <table class="table">
-        <tr>
-            <td>Name</td>
-            <td>Price</td>
-        <tr>
-        <tr ng-repeat="item in $ctrl.items">
-            <td>{{item.name}}</td>
-            <td>
-                <input ng-if="!item.published" type="number" ng-model="item.price">
-                <label ng-if="item.published" type="number">{{item.price}}</label>
-            </td>
-            <td>
-                <button ng-if="!item.published" class="btn btn-default" ng-click="$ctrl.sell(item)">Sell</button>
-                <button ng-if="item.published" class="btn btn-default" disabled="disabled">Published</button>
-            </td>
-        </tr>
-    </table>
-</ul>
+<div class="row">
+    <div class="col-md-12">
+        And these are items you could order:
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-12">
+        <table class="table">
+            <tr>
+                <td>Owner</td>
+                <td>Name</td>
+                <td>Price</td>
+            <tr>
+            <tr ng-repeat="item in $ctrl.items">
+                <td>{{item.ownerName}}</td>
+                <td>{{item.name}}</td>
+                <td>{{item.price}}</td>
+                <td>
+                    <button ng-if="!item.ordered" class="btn btn-default" ng-click="$ctrl.order(item)">Order</button>
+                    <button ng-if="item.ordered" class="btn btn-default" disabled="disabled">Order</button>
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>
