@@ -17,6 +17,7 @@ var Product = require('./lib/product')
 var app = express();
 var server = app.listen(3000);
 var io = require('socket.io').listen(server);
+var _ = require("lodash")
 
 Promise.promisifyAll(redis.RedisClient.prototype);
 Promise.promisifyAll(redis.Multi.prototype);
@@ -81,11 +82,15 @@ io.on('connection', function(socket) {
     redisClient.incrAsync("next_user_id").then(function(res) {
         userID = res
             // store user data using hash
-        return redisClient.hmsetAsync("user:" + userID, ["username", username, "balance", 100])
+        return redisClient.hmsetAsync("user:" + userID, [
+            "username", username,
+            "balance", 100
+        ])
     }).then(function(res) {
         // index userID with username
         return redisClient.hsetAsync("users", [username, userID])
     }).then(function(res) {
+        socket.emit("username", username)
         promises = []
         userItems = []
         for (var i = 0; i < 10; i++) {
@@ -96,7 +101,14 @@ io.on('connection', function(socket) {
                 item.id = id
                 return Promise.all([
                     // store new item with hash
-                    redisClient.hmsetAsync("items:" + item.id, ["name", item.name, "owner", item.owner]),
+                    redisClient.hmsetAsync("items:" + item.id, [
+                        "name", item.name,
+                        "owner", item.owner,
+                        "createdAt", item.createdAt,
+                        "price", item.price,
+                        "published", item.published,
+                        "sold", item.sold
+                    ]),
                     // mark ownership of an item of a user with sorted set
                     redisClient.zaddAsync("assets:" + item.owner, [item.createdAt, item.id])
                 ])
@@ -105,13 +117,32 @@ io.on('connection', function(socket) {
         socket.emit('user-items', userItems)
         return Promise.all(promises)
     }).then(function() {
-        socket.emit("username", username)
+        return redisClient.keysAsync("assets:*")
+    }).then(function(keys) {
+        return Promise.map(keys, function(key) {
+            userId = key.replace("assets:", "")
+            return Promise.join(redisClient.hgetallAsync("user:" + userId), redisClient.zrangeAsync("assets:" + userId, 0, -1)).spread(function(user, assets) {
+                console.log("user: " + stringify(user))
+                console.log("assets: " + stringify(assets))
+                return Promise.join(user, Promise.map(assets, function(itemID) {
+                    return redisClient.hgetallAsync("items:" + itemID)
+                })).spread(function(user, items) {
+                    return {
+                        user: user,
+                        items: items
+                    }
+                })
+            })
+        })
+    }).then(function(otherItems) {
+        socket.emit("other-items", otherItems)
         console.log("done setting up user data")
     }).catch(function(err) {
         console.log(err)
     })
 
     socket.on("sell", function(item) {
+        // TODO: save published items in Redis
         console.log("user selling item " + stringify(item))
     })
 
