@@ -6,20 +6,30 @@
 <div class="row">
     <div class="col-md-12">
         <table class="table">
-            <tr>
-                <td>Owner</td>
-                <td>Name</td>
-                <td>Price</td>
-            <tr>
-            <tr ng-repeat="item in $ctrl.items">
-                <td>{{item.ownerName}}</td>
-                <td>{{item.name}}</td>
-                <td>{{item.price}}</td>
-                <td>
-                    <button ng-if="!item.ordered" class="btn btn-default" ng-click="$ctrl.order(item)">Order</button>
-                    <button ng-if="item.ordered" class="btn btn-default" disabled="disabled">Order</button>
-                </td>
-            </tr>
+            <thead>
+                <tr>
+                    <th>Owner</th>
+                    <th>Name</th>
+                    <th>Price</th>
+                    <th>Bidding Price</th>
+                    <th>Action</th
+                </tr>
+            </thead>
+            <tbody>
+                <tr ng-repeat="item in $ctrl.items">
+                    <td>{{item.ownerName}}</td>
+                    <td>{{item.name}}</td>
+                    <td>{{item.price}}</td>
+                    <td>
+                        <input ng-if="!item.ordered" type="number" ng-model="item.biddingPrice">
+                        <label ng-if="item.ordered" type="number">{{item.biddingPrice}}</label>
+                    </td>
+                    <td>
+                        <button ng-if="!item.ordered" class="btn btn-default" ng-click="$ctrl.order(item)">Order</button>
+                        <button ng-if="item.ordered" class="btn btn-default" disabled="disabled">Order</button>
+                    </td>
+                </tr>
+            </tbody>
         </table>
     </div>
 </div>

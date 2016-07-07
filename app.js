@@ -104,6 +104,7 @@ io.on('connection', function(socket) {
                     item,
                     // store new item with hash
                     redisClient.hmsetAsync("items:" + item.id, [
+                        "id", item.id,
                         "name", item.name,
                         "ownerID", item.ownerID,
                         "ownerName", item.ownerName,
@@ -136,7 +137,6 @@ io.on('connection', function(socket) {
     })
 
     socket.on("sell", function(item) {
-        console.log("user selling item: " + stringify(item))
         item.publishedAt = new Date().getTime()
         socket.broadcast.emit("published", item)
         Promise.all([
@@ -150,7 +150,14 @@ io.on('connection', function(socket) {
     })
 
     socket.on("order", function(order) {
-        console.log("here comes an order: " + stringify(order))
+        redisClient.hmsetAsync("ordered:" + order.user, [
+            "item", order.item.id,
+            "price", order.item.biddingPrice
+        ]).then(function() {
+            console.log("done updating a new order")
+        }).catch(function(err) {
+            console.log("error on order: " + err)
+        })
     })
 
     socket.on('disconnect', function() {

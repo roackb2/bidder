@@ -1,20 +1,31 @@
-<ul>
-    You got these items to sell:
-    <table class="table">
-        <tr>
-            <td>Name</td>
-            <td>Price</td>
-        <tr>
-        <tr ng-repeat="item in $ctrl.items">
-            <td>{{item.name}}</td>
-            <td>
-                <input ng-if="!item.published" type="number" ng-model="item.price">
-                <label ng-if="item.published" type="number">{{item.price}}</label>
-            </td>
-            <td>
-                <button ng-if="!item.published" class="btn btn-default" ng-click="$ctrl.sell(item)">Sell</button>
-                <button ng-if="item.published" class="btn btn-default" disabled="disabled">Published</button>                
-            </td>
-        </tr>
-    </table>
-</ul>
+<div class="row">
+    <div class="col-md-12">
+        You got these items to sell:
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-12">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Price</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr ng-repeat="item in $ctrl.items">
+                    <td>{{item.name}}</td>
+                    <td>
+                        <input ng-if="!item.published" type="number" ng-model="item.price">
+                        <label ng-if="item.published" type="number">{{item.price}}</label>
+                    </td>
+                    <td>
+                        <button ng-if="!item.published" class="btn btn-default" ng-click="$ctrl.sell(item)">Sell</button>
+                        <button ng-if="item.published" class="btn btn-default" disabled="disabled">Published</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
